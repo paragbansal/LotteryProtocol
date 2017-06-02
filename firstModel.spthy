@@ -1,0 +1,108 @@
+theory FirstModel
+begin
+
+builtins: hashing, asymmetric-encryption, signing
+
+// Write rules only for one party.
+// Use of public variable using $.
+// Use hash instead of transaction number.
+// Run it atleast. to check what's up.
+// 
+
+rule Register_pk_A:
+	[ Fr( ~ltk_A), Fr(~sa)]
+	-->
+	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr('T_a', A, b, sig_1)]
+
+rule Reveal_ltk_A:
+  	[!Ltk(A, ltk_A)] --[Reveal(A)]-> [Out(ltk_A)]
+
+rule PutMoney_A:
+	[!Ltk($A, ltk_A)]
+	--[]->
+	[Reqeust_Tr('T_a','PutMoney_a',b, sign(<'T_a',b>,ltk_A))
+	,Out(<'T_a', 'PutMoney_a', b, sign(<'T_a',b>,ltk_A)>)]
+
+rule Miner_1:
+	[!Pk($A,pk_A),
+	Tr('T_a',A,b,sig_1),
+	Request_Tr(<input, output, value, signature >),Fr(~sa)
+	]
+	--[UpdateBlock('PutMoney_a'), Eq(verify(signature, <input,value>,pk_A),true), Eq(b,value),Eq('T_a',input)]->
+	[Tr('PutMoney_a',A,b,signature),Out(h(sa)),PutA()]
+
+rule Register_pk_B:
+	[Fr(~ltk_B)]
+	-->
+	[!Ltk($B,~ltk_B), !Pk($B,pk(~ltk_B)),Tr('T_b',B,b,sig_2),out(h(sb))]
+
+rule Reveal_ltk_B:
+  	[!Ltk(B, ltk_B)] --[Reveal(B)]-> [Out(ltk_B)]
+
+rule PutMoney_B:
+	[!Ltk($B, ltk_B)]
+	--[]->
+	[Reqeust_Tr('T_b','PutMoney_b',b, sign(<'T_b',b>,ltk_B))
+	,Out(<'T_b','PutMoney_b',b, sign(<'T_b',b>,ltk_B) > )]
+
+rule Miner_2:
+	[!Pk($B,pk_B),
+	Tr('T_b',B,b,sig_2),
+	In(<input, output, value, signature>),Fr(~sb)
+	]
+	--[UpdateBlock('PutMoney_b'), Eq(verify(signature, <input,value>,pk_B)), Eq(b,value),Eq('T_b',input)]->
+	[Tr('PutMoney_b',B,b,signature),Out(h(sb)),PutB()]
+
+rule compute_A:
+	[ putA(), putB(), In(hashA),In(hashB),Fr(~rand),~Ltk($A,ltk_A)] 
+	--[]->
+	[ Request_Tr(<'PutMoney_a','PutMoney_b'>,'Compute1',2*b,<sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_A),rand>)]
+
+rule compute_B:
+	[ ~Ltk($B,ltk_B)
+	 ,Request_Tr(<'PutMoney_a','PutMoney_b'>,'Compute1',2*b,<sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_A),rand>)]	--[]->
+	[Request_Tr(<'PutMoney_a','PutMoney_b'>,'Compute1',2*b,<sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_A),sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_B)>)]
+
+	//How to incorportate hash values inside reqeust and transcaction updated on network.
+
+rule Miner_3:
+	[Tr('PutMoney_b',B,b,signature_1),Tr('PutMoney_a',A,b,signature_1),
+	Request_Tr(input, output, value, signature),
+	Request_Tr(<'PutMoney_a','PutMoney_b'>,'Compute1',2*b,<sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_A),sign(<<'PutMoney_a','PutMoney_b'>,2*b>,ltk_B)>)]
+
+	--[Eq((verify(fst(signature), <input,value>),pk_A),true), Eq((verify(snd(signature),<input,value>),pk_B),true),Eq(plus(b,b),value)]->
+
+	[Tr('Compute1',<A,B>,2*b,signature),Done_withCompute_A(), Done_withCompute_B()]
+
+rule reveal_sa:
+	[Done_withCompute_A()] --[]->  [Out(ssa)]
+
+rule reveal_sa:
+	[Done_withCompute_B()] --[]->  [Out(sb)]
+
+rule Claim_A:
+	[In(sa),In(sb), !Ltk($A,ltk_A)]
+	--[]->
+	[Request_Tr('Compute1','ClaimMoneyA',2*b, <sign(<'Compute1',2*b>,ltk_A),sa,sb>)]
+
+rule Claim_B:
+	[In(sa),In(sb), !Ltk($B,ltk_B)]
+	--[]->
+	[Request_Tr('Compute1','ClaimMoneyB',2*b, <sign(<'Compute1',2*b>,ltk_B),sa,sb>)]
+
+rule Miner_4:
+	[!Pk($A,pk_A),Request_Tr(input,output,value, signature)]
+	--[Eq(sa,sb),Eq(verify(signature,<input,value>,pk_A),true)]->
+	[Tr('ClaimMoneyA',A,2*b,signature)]
+
+rule Miner_5:
+	[!Pk($A,pk_B),Request_Tr(input,output,value, signature)]
+	--[NEq(sa,sb),Eq(verify(signature,<input,value>,pk_B),true)]->
+	[Tr('ClaimMoneyB',B,2*b,signature)]
+
+
+lemma1:
+
+// Need to declare facts for starting transactions.
+// Can be modeled as rules using concept of state.
+// Or we can add starting transcation fact input
