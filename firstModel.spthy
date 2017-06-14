@@ -40,41 +40,55 @@ rule Miner_1:
 	[Tr(output,A,value,signature)]
 
 
+rule compute:
+	[ !Ltk(A,ltk_A),!Ltk(B,ltk_B), Tr(tr1,A,mo,sig1), Tr(tr2, B, mo, sig2), Fr(~rand)] 
+	--[Compute_Aexec(A,~rand),Compute_Bexec(B,ltk_B),Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
+	[Request_Tr(<tr1,tr2>,h(< <A,B>,f(mo,mo), <sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>>), f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A),sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>), Tr(tr1,A,mo,sig1), Tr(tr2,B,mo,sig2)]
+
+
+/*
 rule compute_A:
-	[ !Ltk(A,ltk_A), Tr(tr1,A,mo,sig1),Tr(tr2,B,mo,sig2), In(hashA),In(hashB),Fr(~rand)] 
-	--[Compute_Aexec(A,~rand)]->
-	[ Request_Tr(<tr1,tr2>,~rand,f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A),~rand>), Tr(tr1,A,mo,sig1),Tr(tr2,B,mo,sig2)]
-
-
-//Should we use $ in pattern matching of facts.
+	--[Compute_Aexec(A,~rand),Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
+	[ Request_Tr(<tr1,tr2>,~rand,f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), ~rand>), Tr(tr1,A,mo,sig1),Tr(tr2,B,mo,sig2)]
 
 rule compute_B:
-	[ !Ltk($B, ltk_B)
-	 ,Request_Tr(<tr1,tr2>,rand,f(mo,mo), <sig1, rand>)] --[Compute_Bexec($B,ltk_B)]->
-	[Request_Tr(<tr1,tr2>,h(<<$A,$B>,f(mo,mo), <sig1,sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)> >),f(mo,mo),<sig1,sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>)]
+	[ !Ltk(B, ltk_B),Tr(tr2,B,mo,sig2)
+	 ,Request_Tr(<h(<A,mo,sig1>),tr2>,rand,f(mo,mo), <sig1, rand>)] 
+	 --[Compute_Bexec(B,ltk_B), Eq(tr2,h(<B,mo,sig2>))]->
+	[]
+*/
 
-	//How to incorportate hash values inside reqeust and transcaction updated on network.
+//How to incorportate hash values inside reqeust and transcaction updated on network.
 
 rule Miner_3:
 	[Tr(tr1,A,mo,sig_1), Tr(tr2,B,mo,sig_2),
-	Request_Tr(input, output, value, signature),
-	!Pk(A,pk_A),!Pk(B,pk_B)]
+	Request_Tr(<tr1,tr2>, h(<<A,B>, value, signature>), value, signature),
+	!Pk(A,pk_A), !Pk(B,pk_B)]
 
-	--[Mine_3(output), Eq(verify(fst(signature), <input,value>,pk_A),true), Eq(verify(snd(signature),<input,value>,pk_B),true),Eq(f(mo,mo),value)]->
+	--[Mine_3(h(<A,B>,value,signature)), Eq(verify(fst(signature), <<tr1,tr2>,value>,pk_A),true), Eq(verify(snd(signature),<<tr1,tr2>,value>,pk_B),true), Eq(f(mo,mo),value), Eq(tr1,h(<A,mo,sig_1>)), Eq(tr2,h(<B,mo,sig_2>))]->
 
-	[Tr(output,<A,B>,value,signature)]
+	[Tr(h(<A,B>,value,signature),<A,B>,value,signature)]
+
 
 restriction Equality:
 "All x y #i. Eq(x,y) @i ==> x = y"
 
 rule reveal_secret:
-	[Secret(A, secret)] --[]->[Out(secret)]
+	[Secret(A, secret)] --[]-> [Out(secret)]
 
 rule Redeem_A:
-	[Tr(output,<A,B>,value,signature), Secret(A,secret)]
+	[Tr(output, <A,B>, value, signature),!Ltk(A,ltk_A), Secret(A,secret),Secret(B,secret2)] --[Winner(A,ltk_A)]-> [Tr(output, A, value,signature)]
 
 rule Redeem_B:
-	[Tr(output,<A,B>,value,signature), Secret(B,secret)]
+	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B)]-> [Tr(output,B,value,signature)]
+
+lemma lemma_2:
+	exists-trace
+	"
+		Ex A ltk #i.
+		Winner(A,ltk) @i
+	"
+
 lemma lemma_1:
 	exists-trace
 	"
