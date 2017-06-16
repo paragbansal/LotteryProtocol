@@ -1,4 +1,4 @@
-theory FirstModel
+theory SecondModel
 begin
 
 builtins: hashing, asymmetric-encryption, signing
@@ -12,22 +12,28 @@ functions: f/2
 rule Register_pk_A:
 	[ Fr(~ltk_A), Fr(~sig_1),Fr(~secret)]
 	--[Reg($A, ~ltk_A) ]->
-	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,~sig_1>), $A, $mo, ~sig_1), Out(h(~secret)), Secret($A, ~secret)]
+	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,~sig_1>), $A, $mo, ~sig_1), Out(h(~secret)), Secret($A, ~secret), Out(<h(<$A,$mo,~sig_1>), $A, $mo, ~sig_1>)]
 
 restriction unique:
-	"All P key1 key2 #i #j. Reg(P,key1) @#i & Reg(P,key2) @#j ==> #i = #j"
+	"All P key1 key2 #i #j. Reg(P,key1) @#i & Reg(P, key2) @#j ==> #i = #j"
 
 rule Reveal_ltk_A:
   	[!Ltk(A, ltk_A)]--[Reveal(A)]-> [Out(ltk_A)]
 
 rule PutMoney_A:
 	[!Ltk(A, ltk_A), Tr(hash_tr, A, mo, sig_1)]
-	--[Requested(A,hash_tr)]->
-	[Request_Tr(hash_tr,h(<A,mo,sign(<hash_tr,mo>,ltk_A)>), mo, sign(<hash_tr,mo>,ltk_A)),
+	--[]->
+	[ Out(hash_tr),Out(h(<A, mo, sign(<hash_tr,mo>, ltk_A)>)), Out(mo),Out(sign(<hash_tr,mo>,ltk_A)),
 	Tr(hash_tr, A, mo, sig_1)]
+
+rule ReqeustInterface1:
+	[In(hash_tr),In(output),In(value),In(signature),!Ltk(A, ltk_A), !Pk(A,pk_A), Tr(hash_tr, A, mo, sig_1)]
+	--[Requested(A, hash_tr),Eq(verify(signature, <hash_tr, value>, pk_A),true),Eq(output, h(<A,value,signature>))]->
+	[Request_Tr(hash_tr, output, value, signature),Tr(hash_tr, A, mo, sig_1)]
 
 restriction unique2:
 	" All P hash_tr1 hash_tr2 #i #j. Requested(P,hash_tr1) @#i & Requested(P,hash_tr2) @#j ==> #i = #j "
+
 
 rule Miner_1:
 	[
@@ -37,7 +43,7 @@ rule Miner_1:
 	]
 	--[ UpdateBlock('PutMoney_a'), Eq(verify(signature, <hash_tr,value>, pk_A),true),Mine(A,hash_tr)]->
 	
-	[Tr(output,A,value,signature)]
+	[Tr(output,A,value,signature), Out(<output,A,value,signature>)]
 
 
 rule compute:
@@ -45,6 +51,12 @@ rule compute:
 	--[Compute_Aexec(A,~rand),Compute_Bexec(B,ltk_B),Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
 	[Request_Tr(<tr1,tr2>,h(< <A,B>,f(mo,mo), <sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>>), f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A),sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>), Tr(tr1,A,mo,sig1), Tr(tr2,B,mo,sig2)]
 
+/*
+rule RequestInterface2:
+	[]
+	--[]->
+	[]
+*/
 
 /*
 rule compute_A:
@@ -97,6 +109,7 @@ lemma lemma_2:
 	"
 		Ex A ltk #i.
 		Winner(A,ltk) @i
+		& not (Ex B #j. Reveal(B) @j)
 	"
 
 lemma lemma_1:
