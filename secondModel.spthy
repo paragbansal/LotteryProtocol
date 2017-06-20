@@ -12,7 +12,9 @@ functions: f/2
 rule Register_pk_A:
 	[ Fr(~ltk_A), Fr(~sig_1),Fr(~secret)]
 	--[Reg($A, ~ltk_A) ]->
-	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,~sig_1>), $A, $mo, ~sig_1), Out(h(~secret)), Secret($A, ~secret), Out(<h(<$A,$mo,~sig_1>), $A, $mo, ~sig_1>)]
+
+	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>), $A, $mo, sign(<$A,$mo>,~ltk_A)), Out(h(~secret)), Secret($A, ~secret),
+	Out(h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>)), Out($A), Out($mo), Out(sign(<h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>),$mo>,~ltk_A)) ]
 
 restriction unique:
 	"All P key1 key2 #i #j. Reg(P,key1) @#i & Reg(P, key2) @#j ==> #i = #j"
@@ -20,16 +22,20 @@ restriction unique:
 rule Reveal_ltk_A:
   	[!Ltk(A, ltk_A)]--[Reveal(A)]-> [Out(ltk_A)]
 
+/*
 rule PutMoney_A:
 	[!Ltk(A, ltk_A), Tr(hash_tr, A, mo, sig_1)]
-	--[]->
-	[ Out(hash_tr),Out(h(<A, mo, sign(<hash_tr,mo>, ltk_A)>)), Out(mo),Out(sign(<hash_tr,mo>,ltk_A)),
-	Tr(hash_tr, A, mo, sig_1)]
+	--[Eq(sig_1, sign(<A,mo>,ltk_A)), Eq(hash_tr,h(<A,mo,sign(<A,mo>,ltk_A)>))]->
+	[ Out(hash_tr),Out(h(<A, mo, sign(< hash_tr, mo >, ltk_A)>)), Out(mo), Out(sign(<hash_tr,mo>,ltk_A)),
+	Tr(hash_tr, A, mo, sig_1),]
+
+	Removed from request Interface Eq(verify(signature, <hash_tr, value>, pk_A),true),
+*/
 
 rule ReqeustInterface1:
-	[In(hash_tr),In(output),In(value),In(signature),!Ltk(A, ltk_A), !Pk(A,pk_A), Tr(hash_tr, A, mo, sig_1)]
-	--[Requested(A, hash_tr),Eq(verify(signature, <hash_tr, value>, pk_A),true),Eq(output, h(<A,value,signature>))]->
-	[Request_Tr(hash_tr, output, value, signature),Tr(hash_tr, A, mo, sig_1)]
+	[In(hash_tr),In(output),In(mo),In(signature),!Ltk(A, ltk_A), !Pk(A,pk_A), Tr(hash_tr, A, mo, sig_1)]
+	--[Requested(A, hash_tr),Eq(output, h(<A,mo,signature>)), Eq(hash_tr,h(<A,mo,sign(<A,mo>,ltk_A)>)) ]->
+	[Request_Tr(hash_tr, output, mo, signature),Tr(hash_tr, A, mo, sig_1)]
 
 restriction unique2:
 	" All P hash_tr1 hash_tr2 #i #j. Requested(P,hash_tr1) @#i & Requested(P,hash_tr2) @#j ==> #i = #j "
@@ -58,18 +64,6 @@ rule RequestInterface2:
 	[]
 */
 
-/*
-rule compute_A:
-	--[Compute_Aexec(A,~rand),Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
-	[ Request_Tr(<tr1,tr2>,~rand,f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), ~rand>), Tr(tr1,A,mo,sig1),Tr(tr2,B,mo,sig2)]
-
-rule compute_B:
-	[ !Ltk(B, ltk_B),Tr(tr2,B,mo,sig2)
-	 ,Request_Tr(<h(<A,mo,sig1>),tr2>,rand,f(mo,mo), <sig1, rand>)] 
-	 --[Compute_Bexec(B,ltk_B), Eq(tr2,h(<B,mo,sig2>))]->
-	[]
-*/
-
 //How to incorportate hash values inside reqeust and transcaction updated on network.
 
 rule Miner_3:
@@ -89,10 +83,10 @@ rule reveal_secret:
 	[Secret(A, secret)] --[]-> [Out(secret)]
 
 rule Redeem_A:
-	[Tr(output, <A,B>, value, signature),!Ltk(A,ltk_A), Secret(A,secret), Secret(B,secret2)] --[Winner(A,ltk_A)]-> [Tr(output, A, value,signature)]
+	[Tr(output, <A,B>, value, signature),!Ltk(A,ltk_A), Secret(A,secret), Secret(B,secret2)] --[Winner(A,ltk_A,B)]-> [Tr(output, A, value,signature)]
 
 rule Redeem_B:
-	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B)]-> [Tr(output, B, value, signature)]
+	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B,A)]-> [Tr(output, B, value, signature)]
 
 /*
 lemma lemma_3:
@@ -104,11 +98,15 @@ lemma lemma_3:
 	"
 */
 
+lemma atmost_one:
+	"
+		not ( Ex A B ltk_A ltk_B #i #j. Winner(A,ltk_A,B) @i  & Winner(B,ltk_B,A) @j )
+	"
 lemma lemma_2:
 	exists-trace
 	"
-		Ex A ltk #i.
-		Winner(A,ltk) @i
+		Ex A B ltk #i.
+		Winner(A,ltk,B) @i
 		& not (Ex B #j. Reveal(B) @j)
 	"
 
