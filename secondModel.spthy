@@ -85,11 +85,12 @@ rule reveal_secret:
 rule Redeem_A:
 	[Tr(output, <A,B>, value, signature),!Ltk(A,ltk_A), Secret(A,secret), Secret(B,secret2)] --[Winner(A,ltk_A,B)]-> [Tr(output, A, value,signature)]
 
+
 rule Redeem_B:
-	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B,A)]-> [Tr(output, B, value, signature)]
+	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B,A)]-> [Tr(output, B, value, signature)] 
 
 /*
-lemma lemma_3:
+lemma lemma_3:	
 	"
 		Ex A ltk #i.
 		Winner(A,ltk) @i
@@ -98,10 +99,17 @@ lemma lemma_3:
 	"
 */
 
+lemma liveness:
+	"
+		All A B ltk_a ltk_b #i #j. 
+		Compute_Aexec(A, ltk_a) @i & Compute_Bexec(B,ltk_b) @j ==> (Ex #x. Winner(A,ltk_a,B)@x )  	
+	"
+
 lemma atmost_one:
 	"
-		not ( Ex A B ltk_A ltk_B #i #j. Winner(A,ltk_A,B) @i  & Winner(B,ltk_B,A) @j )
+	 All A B ltk_A ltk_B #i #j. Winner(A,ltk_A,B) @i  & Winner(B,ltk_B,A) @j  ==> (A=B)
 	"
+
 lemma lemma_2:
 	exists-trace
 	"
