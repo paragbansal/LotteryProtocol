@@ -13,7 +13,7 @@ rule Register_pk_A:
 	[ Fr(~ltk_A), Fr(~sig_1),Fr(~secret)]
 	--[Reg($A, ~ltk_A) ]->
 
-	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>), $A, $mo, sign(<$A,$mo>,~ltk_A)), Out(h(~secret)), Secret($A, ~secret),
+	[ !Ltk($A, ~ltk_A), !Pk($A, pk(~ltk_A)), Tr(h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>), $A, $mo, sign(<$A,$mo>,~ltk_A)), Out(h(~secret)), Secret($A, ~secret), Check($A,~secret),
 	Out(h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>)), Out($A), Out($mo), Out(sign(<h(<$A,$mo,sign(<$A,$mo>,~ltk_A)>),$mo>,~ltk_A)) ]
 
 restriction unique:
@@ -23,6 +23,7 @@ rule Reveal_ltk_A:
   	[!Ltk(A, ltk_A)]--[Reveal(A)]-> [Out(ltk_A)]
 
 /*
+
 rule PutMoney_A:
 	[!Ltk(A, ltk_A), Tr(hash_tr, A, mo, sig_1)]
 	--[Eq(sig_1, sign(<A,mo>,ltk_A)), Eq(hash_tr,h(<A,mo,sign(<A,mo>,ltk_A)>))]->
@@ -38,7 +39,7 @@ rule ReqeustInterface1:
 	[Request_Tr(hash_tr, output, mo, signature),Tr(hash_tr, A, mo, sig_1)]
 
 restriction unique2:
-	" All P hash_tr1 hash_tr2 #i #j. Requested(P,hash_tr1) @#i & Requested(P,hash_tr2) @#j ==> #i = #j "
+	" All P hash_tr1 hash_tr2 #i #j. Requested(P, hash_tr1) @#i & Requested(P, hash_tr2) @#j ==> #i = #j "
 
 
 rule Miner_1:
@@ -51,10 +52,9 @@ rule Miner_1:
 	
 	[Tr(output,A,value,signature), Out(<output,A,value,signature>)]
 
-
 rule compute:
 	[ !Ltk(A,ltk_A),!Ltk(B,ltk_B), Tr(tr1,A,mo,sig1), Tr(tr2, B, mo, sig2), Fr(~rand)] 
-	--[Compute_Aexec(A,~rand),Compute_Bexec(B,ltk_B),Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
+	--[Compute_exec(A,B), Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
 	[Request_Tr(<tr1,tr2>,h(< <A,B>,f(mo,mo), <sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>>), f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A),sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>), Tr(tr1,A,mo,sig1), Tr(tr2,B,mo,sig2)]
 
 /*
@@ -71,43 +71,44 @@ rule Miner_3:
 	Request_Tr(<tr1,tr2>, h(<<A,B>, value, signature>), value, signature),
 	!Pk(A,pk_A), !Pk(B,pk_B)]
 
-	--[Mine_3(h(<A,B>,value,signature)), Eq(verify(fst(signature), <<tr1,tr2>,value>,pk_A),true), Eq(verify(snd(signature),<<tr1,tr2>,value>,pk_B),true), Eq(f(mo,mo),value), Eq(tr1,h(<A,mo,sig_1>)), Eq(tr2,h(<B,mo,sig_2>))]->
+	--[Mine_3(A,B), Eq(verify(fst(signature), <<tr1,tr2>,value>,pk_A),true), Eq(verify(snd(signature),<<tr1,tr2>,value>,pk_B),true), Eq(f(mo,mo),value), Eq(tr1,h(<A,mo,sig_1>)), Eq(tr2,h(<B,mo,sig_2>))]->
 
 	[Tr(h(<A,B>,value,signature),<A,B>,value,signature)]
 
-
-restriction Equality: 
-"All x y #i. Eq(x,y) @i ==> x = y"
 
 rule reveal_secret:
 	[Secret(A, secret)] --[]-> [Out(secret)]
 
 rule Redeem_A:
-	[Tr(output, <A,B>, value, signature),!Ltk(A,ltk_A), Secret(A,secret), Secret(B,secret2)] --[Winner(A,ltk_A,B)]-> [Tr(output, A, value,signature)]
+	[Tr(output, <A,B>, value, signature),!Ltk(A, ltk_A),In(secret2) ,In(secret),Check(A, secret), Check(B, secret2)] --[Winner(A,ltk_A,B)]-> [Tr(output, A, value, signature)]
 
 
 rule Redeem_B:
-	[Tr(output, <A,B>, value, signature), !Ltk(B,ltk_B),Secret(A, secret), Secret(B,secret2)] --[Winner(B,ltk_B,A)]-> [Tr(output, B, value, signature)] 
+	[Tr(output, <A,B>, value, signature), !Ltk(B, ltk_B), In(secret2) ,In(secret), Check(A, secret), Check(B, secret2)] --[Winner(B,ltk_B,A)]-> [Tr(output, B, value, signature)] 
+
+
+restriction Live_1:
+"All A B #i. Compute_exec(A,B) @i ==> Ex #j. Mine_3(A,B) @j"
+
+restriction Equality: 
+"All x y #i. Eq(x,y) @i ==> x = y"
 
 /*
-lemma lemma_3:	
-	"
-		Ex A ltk #i.
-		Winner(A,ltk) @i
-		==>
-		(Ex B rand #j. Compute_Aexec(A,rand) @j)
-	"
+restriction Live_2:
+"All A B #i. Mine_3(A,B) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)|(Ex #k ltk_B. Winner(B,ltk_B,A) @k)"
 */
 
 lemma liveness:
 	"
-		All A B ltk_a ltk_b #i #j. 
-		Compute_Aexec(A, ltk_a) @i & Compute_Bexec(B,ltk_b) @j ==> (Ex #x. Winner(A,ltk_a,B)@x )  	
+		All A B #i. 
+		Compute_exec(A,B) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)|(Ex #k ltk_B. Winner(B,ltk_B,A) @k)	
 	"
 
 lemma atmost_one:
 	"
-	 All A B ltk_A ltk_B #i #j. Winner(A,ltk_A,B) @i  & Winner(B,ltk_B,A) @j  ==> (A=B)
+
+	All A B ltk_A ltk_B #i #j. Winner(A,ltk_A,B) @i  & Winner(B,ltk_B,A) @j  ==> (A=B)
+
 	"
 
 lemma lemma_2:
@@ -117,47 +118,17 @@ lemma lemma_2:
 		Winner(A,ltk,B) @i
 		& not (Ex B #j. Reveal(B) @j)
 	"
-
+	
 lemma lemma_1:
 	exists-trace
 	"
-		Ex A B hash_tr rand rand2 rand3 #i #j #k #l #m.
+		Ex A B hash_tr #i #j #k #m.
 			Requested(A,hash_tr) @ i &
 			Mine(A,hash_tr) @ j &
-			Compute_Aexec(A,rand) @ k &
-			Compute_Bexec(B,rand2) @l &
-			Mine_3(rand3) @m
+			Compute_exec(A,B) @k & 
+			Mine_3(A,B) @m
 	"
 end
-
-/*
-
-rule reveal_sa:
-	[Done_withCompute_A(),Fr(~sa)] --[]->  [Out(~sa)]
-
-rule reveal_sa:
-	[Done_withCompute_B(),Fr(~sb)] --[]->  [Out(~sb)]
-
-rule Claim_A:
-	[In(sa),In(smo), !Ltk($A,ltk_A)]
-	--[]->
-	[Request_Tr('Compute1','ClaimMoneyA',2*mo, <sign(<'Compute1',2*mo>,ltk_A),sa,smo>)]
-
-rule Claim_B:
-	[In(sa),In(smo), !Ltk($B,ltk_B)]
-	--[]->
-	[Request_Tr('Compute1','ClaimMoneyB',2*m, <sign(<'Compute1',2*m>,ltk_B),sa,sb>)]
-
-rule Miner_4:
-	[!Pk($A,pk_A),Request_Tr(input,output,value, signature)]
-	--[Eq(sa,sb),Eq(verify(signature,<input,value>,pk_A),true)]->
-	[Tr('ClaimMoneyA',A,2*m,signature)]
-
-rule Miner_5:
-	[!Pk($A,pk_B),Request_Tr(input,output,value, signature)]
-	--[NEq(sa,sm),Eq(verify(signature,<input,value>,pk_B),true)]->
-	[Tr('ClaimMoneyB',B,2*m,signature)]
-*/
 
 // Need to declare facts for starting transactions.
 // Can be modeled as rules using concept of state.
