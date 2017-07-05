@@ -54,7 +54,7 @@ rule Miner_1:
 
 rule compute:
 	[ !Ltk(A,ltk_A),!Ltk(B,ltk_B), Tr(tr1,A,mo,sig1), Tr(tr2, B, mo, sig2), Fr(~rand)] 
-	--[Compute_exec(A,B), Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
+	--[Compute_exec(A,B,mo), Eq(tr1,h(<A,mo,sig1>)), Eq(tr2,h(<B,mo,sig2>))]->
 	[Request_Tr(<tr1,tr2>,h(< <A,B>,f(mo,mo), <sign(<<tr1,tr2>,f(mo,mo)>,ltk_A), sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>>), f(mo,mo),<sign(<<tr1,tr2>,f(mo,mo)>,ltk_A),sign(<<tr1,tr2>,f(mo,mo)>,ltk_B)>), Tr(tr1,A,mo,sig1), Tr(tr2,B,mo,sig2)]
 
 /*
@@ -71,7 +71,7 @@ rule Miner_3:
 	Request_Tr(<tr1,tr2>, h(<<A,B>, value, signature>), value, signature),
 	!Pk(A,pk_A), !Pk(B,pk_B)]
 
-	--[Mine_3(A,B), Eq(verify(fst(signature), <<tr1,tr2>,value>,pk_A),true), Eq(verify(snd(signature),<<tr1,tr2>,value>,pk_B),true), Eq(f(mo,mo),value), Eq(tr1,h(<A,mo,sig_1>)), Eq(tr2,h(<B,mo,sig_2>))]->
+	--[Mine_3(A,B,mo), Eq(verify(fst(signature), <<tr1,tr2>,value>,pk_A),true), Eq(verify(snd(signature),<<tr1,tr2>,value>,pk_B),true), Eq(f(mo,mo),value), Eq(tr1,h(<A,mo,sig_1>)), Eq(tr2,h(<B,mo,sig_2>))]->
 
 	[Tr(h(<A,B>,value,signature),<A,B>,value,signature)]
 
@@ -88,20 +88,22 @@ rule Redeem_B:
 
 
 restriction Live_1:
-"All A B #i. Compute_exec(A,B) @i ==> Ex #j. Mine_3(A,B) @j"
+"All A B mo #i. Compute_exec(A,B,mo) @i ==> Ex #j. Mine_3(A,B,mo) @j"
 
 restriction Equality: 
 "All x y #i. Eq(x,y) @i ==> x = y"
 
-/*
+
+
 restriction Live_2:
-"All A B #i. Mine_3(A,B) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)|(Ex #k ltk_B. Winner(B,ltk_B,A) @k)"
-*/
+	"All A B mo #i. Mine_3(A,B,mo) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)|(Ex #k ltk_B. Winner(B,ltk_B,A) @k)"
+
+
 
 lemma liveness:
 	"
-		All A B #i. 
-		Compute_exec(A,B) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)|(Ex #k ltk_B. Winner(B,ltk_B,A) @k)	
+		All A B mo #i. 
+		Compute_exec(A,B,mo) @i ==> (Ex #j ltk_A. Winner(A,ltk_A,B) @j)	
 	"
 
 lemma atmost_one:
@@ -122,11 +124,11 @@ lemma lemma_2:
 lemma lemma_1:
 	exists-trace
 	"
-		Ex A B hash_tr #i #j #k #m.
+		Ex A B  mo hash_tr #i #j #k #m.
 			Requested(A,hash_tr) @ i &
 			Mine(A,hash_tr) @ j &
-			Compute_exec(A,B) @k & 
-			Mine_3(A,B) @m
+			Compute_exec(A,B,mo) @k & 
+			Mine_3(A,B,mo) @m
 	"
 end
 
