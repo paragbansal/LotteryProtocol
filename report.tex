@@ -91,11 +91,21 @@ Tamarin prover is powerful tool for symbolic modeling and analysis of security p
 protocol in different roles(e.g. initiator, responder), a specification of the adversary, and a specification of the protocol’s desired properties. We write the desired security properties of protocol in form of lemmas, while action of agents are specified as rules using multiset rewrite rules. \\
 A rewrite rule in Tamarin has a name and three parts, each of which is a sequence of facts: one for
 the rule’s left-hand side, one labelling the transition (which we call 'action facts'), and one for the rule’s right-hand side.\\
-Initial state of the transition system is empty multiset. The rules define how the system can make a transition to a new state. A rule can be applied to a state if it can be instantiated such that its left hand side is contained in the current state. In this case, the left-hand side facts are removed from the state, and replaced by the instantiated right hand side.\\
+Initial state of the transition system is empty multiset. The rules define how the system can make a transition to a new state. A rule can be applied to a state if it can be instantiated such that its left hand side is contained in the current state. In tis case, the left-hand side facts are removed from the state, and replaced by the instantiated right hand side.\\
 
 \subsection{Model}
-To find the security flaws in this protocol, we will try to model this blockchain based protocol in tamarin-prover.
+To find the security flaws in this protocol, we will try to model this blockchain based protocol in tamarin-prover. We will assume that our blockchain has no security flaws, i.e. only valid transactions can be posted on the blockchain, double spending is not possible and only the eligible users can redeem those transactions. These assumption are necessary to start modeling our protocol in tamarin.\\
+\subsection{Modeling block chain transactions}
+We will model blockchain transactions as facts (Tr facts). Transaction facts have four parameters needed to identify the owner of transaction, value of transaction, signature to redeem the previous transaction and hash transaction (unique value to identify the transaction).\\
+In general case, a transaction can be redeemed by anyone who can satisfy the requirement of output script present in transaction, but since tamarin does not allow us to write general scripts in transaction, we will use only owner id in the output script, and by default it can be redeemed by owners signature.\\  \\In case, multiple people can possibly redeem the transaction then all them are listed as tuple and output script conditions are written in mining rules, this helps modeling the similar functionality without writing general output scripts in transaction facts.\\
+\subsection{Modeling Miners}
+If any party wants to put a transaction on blockchain, then it has to generate a request-Tr rule, utilizing already present transaction facts. These request-Tr facts have same number of parameter as transaction facts. These request-Tr facts are later converted to transaction facts(i.e. posted on blockchain) if they satisfy the requirement to redeem those transaction , which might a signature or some input to satisfy output script. Anything can be modeled using these transaction facts.\\
+\subsection{Modeling Adversary}
+Each of the requests-Tr and Transaction created are outputted on public channel, since it is public in blockchain, the adversary might utilize any information to exploit the protocol. In tamarin, adversary can create any input by computing any public function on any publicly available input.
 
+\subsection{Modeling security properties}
+Security properties are modeled by taking into account what are the facts presents in final state of protocol, and whether it is possible to reach the final state. We write a exist trace property to find  a valid transition diagram to reach final state. Also, the lemmas to verify that only at-most one party can be winner are written. \\
 
-
+\section{Conclusion and Future work}
+We were successfully able to verify the exist-trace lemma and atmost one winner property. Traces for these executions are present in image directory, along with tamarin model for the same. Next, we need to focus on proving the liveness property, and finding a execution in which a party does not share his/her secret which causes protocol to halt and both parties looses their  money, then use timed commitments scheme to show that such scenario is not possible if we use timed commitments. 
 \end{document}
